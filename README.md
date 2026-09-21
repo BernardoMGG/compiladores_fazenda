@@ -59,26 +59,51 @@ Além disso:
 
 ## Como executar
 
-Requer apenas **Python 3.9+** (sem dependências externas).
+### Pré-requisitos
+
+- **Python 3.9 ou superior** (sem dependências externas, não precisa de `pip install`).
+- Para conferir a versão instalada: `python --version`.
+
+### Passo a passo
+
+1. Abra um terminal **na pasta do projeto** (a que contém `minec.py`). No VS Code: *Terminal → New Terminal*.
+2. Rode um dos comandos abaixo.
 
 ```bash
-# Demonstração: tabela de tokens, AST e exemplos de erros léxicos/sintáticos
+# Demonstração completa: tabela de tokens, AST e exemplos de erros léxicos/sintáticos
 python exemplo_minec.py
 
-# Valida a gramática (LL(1)) e os arquivos de exemplos/
+# Valida a gramática (sem conflitos LL(1)) e os arquivos de exemplos/
 python ferramentas/validador_gramatica.py
 
 # Imprime os conjuntos FIRST/FOLLOW de cada não terminal
 python ferramentas/validador_gramatica.py sets
 ```
 
-Para usar o compilador em código próprio:
+> **Windows:** se `python` não for reconhecido, use `py` no lugar (ex.: `py exemplo_minec.py`).
+> **Emojis ou acentos quebrados:** no PowerShell, rode antes `$env:PYTHONIOENCODING = "utf-8"`.
+
+O `exemplo_minec.py` executa o programa MineC que está escrito dentro dele (a fazenda completa). Ele mostra, em ordem, o código-fonte, a tabela de tokens, a AST e cinco exemplos de erros.
+
+### Rodar um arquivo `.minec`
+
+Para analisar qualquer arquivo de `exemplos/` (ou o seu), mostrando a AST:
+
+```bash
+python -c "from minec import *; print(ParserMineC(LexerMineC(open('exemplos/02_irrigacao.minec', encoding='utf-8').read()).tokenize()).parse().print_tree())"
+```
+
+Troque `02_irrigacao.minec` pelo arquivo desejado. Se o código tiver erro léxico ou sintático, a mensagem mostra linha e coluna.
+
+### Usar como biblioteca
 
 ```python
 from minec import LexerMineC, ParserMineC
 
-tokens = LexerMineC(codigo_fonte).tokenize()
-ast = ParserMineC(tokens).parse()
+codigo_fonte = 'craft x = 1 + 2\nsay x'
+
+tokens = LexerMineC(codigo_fonte).tokenize()   # lista de tokens (termina em TK_EOF)
+ast = ParserMineC(tokens).parse()               # árvore sintática
 print(ast.print_tree())
 ```
 
