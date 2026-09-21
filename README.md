@@ -166,3 +166,6 @@ Resultado atual: **nenhum conflito LL(1)** e os três exemplos são aceitos.
 ## Fora do escopo
 
 Análise semântica (declaração antes do uso, tipos, escopo) e geração de código estão descritas como regras informais na documentação, mas ainda não foram implementadas.
+
+## Figma 
+versão 1.0 <br> https://www.figma.com/make/iZKjuNcyeJPUuvjSl3NoTC/MineC-Irrigation-Monitoring-App?code-node-id=0-6&p=f&t=i0Syq68twlJCT94Z-0&fullscreen=1
