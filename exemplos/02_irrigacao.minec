@@ -1,0 +1,14 @@
+# Irrigação automática por umidade do solo
+observer umidade = 34
+lever bomba = 8
+craft limite = 30
+
+mine umidade
+if umidade < limite {
+    say "Solo seco: ligando a bomba"
+    power bomba
+    wait 10
+    unpower bomba
+} else {
+    say "Solo úmido: nada a fazer"
+}

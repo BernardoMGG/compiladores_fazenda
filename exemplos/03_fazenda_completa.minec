@@ -1,0 +1,49 @@
+# Fazenda automática de trigo - MineC
+
+observer umidade = 34
+observer temperatura = 35
+lever bomba = 8
+lever ventilador = 9
+
+craft limiteSeco = 30
+craft limiteQuente = 32.5
+craft ciclos = 0
+
+command irrigar(segundos) {
+    say "Irrigando..."
+    power bomba
+    wait segundos
+    unpower bomba
+}
+
+command mediaSimples(a, b) {
+    drop (a + b) / 2
+}
+
+say "Fazenda iniciada"
+
+craft anterior = 0
+
+while true {
+    mine umidade
+    mine temperatura
+
+    craft media = mediaSimples(umidade, anterior)
+    anterior = umidade
+
+    if media < limiteSeco and not (temperatura > limiteQuente) {
+        irrigar(10)
+        ciclos = ciclos + 1
+    } else if temperatura >= limiteQuente {
+        power ventilador
+    } else {
+        unpower ventilador
+    }
+
+    if ciclos == 5 {
+        say "Ciclo de manutenção"
+        ciclos = 0
+    }
+
+    wait 60
+}
