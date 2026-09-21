@@ -1,7 +1,7 @@
 # MineC — Documentação da Linguagem
 
 **Disciplina:** Linguagens Formais e Compiladores
-**Tema:** Linguagem para programar uma fazenda automática simulada, estilo Minecraft
+**Tema:** Linguagem para programar uma plantação automática simulada, estilo Minecraft: checa a umidade da terra, rega se precisar e observa se já pode ser colhida
 **Escopo desta entrega:** definição da linguagem, análise léxica e análise sintática.
 
 Documentos relacionados: [Tabela de Tokens](tabela-de-tokens.md) · [Exemplos de programas](../exemplos/)
@@ -14,13 +14,20 @@ Documentos relacionados: [Tabela de Tokens](tabela-de-tokens.md) · [Exemplos de
 3. [Análise sintática](#3-análise-sintática)
 4. [Regras semânticas (informais)](#4-regras-semânticas-informais)
 5. [Implementação e verificação da gramática](#5-implementação-e-verificação-da-gramática)
-6. [Material sugerido para o Figma](#6-material-sugerido-para-o-figma)
 
 ---
 
 ## 1. Visão geral da linguagem
 
-MineC é uma linguagem imperativa, pequena e de leitura fácil, criada para descrever o comportamento de uma fazenda automática simulada: ela **lê sensores** (umidade, temperatura), **decide** com condições e laços e **aciona atuadores** (bomba de água, ventilador). Sensores e atuadores são conceitos da própria linguagem; o projeto não depende de nenhum hardware. As palavras-chave usam o vocabulário do Minecraft:
+MineC é uma linguagem imperativa, pequena e de leitura fácil, criada para descrever o comportamento de uma plantação automática simulada: ela **lê sensores** (umidade da terra, maturidade da planta), **decide** com condições e laços e **aciona atuadores** (bomba de água). Sensores e atuadores são conceitos da própria linguagem; o projeto não depende de nenhum hardware.
+
+**Ciclo da plantação.** Um programa MineC típico repete três passos:
+
+1. **Checar a umidade da terra:** `mine umidade` lê o sensor.
+2. **Regar, se precisar:** se a umidade está abaixo do limite, liga a bomba (`power bomba`), espera e desliga (`unpower bomba`).
+3. **Observar se pode colher:** `mine maturidade` lê o sensor de maturidade e o programa avisa (`say`) se a planta está pronta, quase pronta ou ainda crescendo. A colheita em si **não é automática**: a linguagem só observa e informa.
+
+Um programa completo com esses passos está em [`exemplos/03_fazenda_completa.minec`](../exemplos/03_fazenda_completa.minec). As palavras-chave usam o vocabulário do Minecraft:
 
 | Conceito | Palavra MineC | Ideia no Minecraft |
 |---|---|---|
@@ -108,53 +115,6 @@ Lista completa de tokens em [tabela-de-tokens.md](tabela-de-tokens.md).
 ### 2.5 Autômato finito determinístico
 
 AFD **M = (Q, Σ, δ, q0, F)** com um estado inicial `q0`; os estados finais retornam o token indicado.
-
-```mermaid
-stateDiagram-v2
-    direction LR
-    state "q0 inicio" as q0
-    state "q1 IDENTIFIER ou reservada" as q1
-    state "q2 INTEGER" as q2
-    state "q3 (ponto lido)" as q3
-    state "q4 DECIMAL" as q4
-    state "q5 (dentro da string)" as q5
-    state "q6 STRING" as q6
-    state "q7 ASSIGN" as q7
-    state "q8 EQUAL" as q8
-    state "q9 (bang lido)" as q9
-    state "q10 NOT_EQUAL" as q10
-    state "q11 LESS" as q11
-    state "q12 LESS_EQUAL" as q12
-    state "q13 GREATER" as q13
-    state "q14 GREATER_EQUAL" as q14
-    state "q15 simbolo simples" as q15
-    state "q16 (comentario)" as q16
-
-    [*] --> q0
-    q0 --> q0 : espaco, tab, quebra de linha
-    q0 --> q1 : letra ou sublinhado
-    q1 --> q1 : letra, digito ou sublinhado
-    q0 --> q2 : digito
-    q2 --> q2 : digito
-    q2 --> q3 : ponto
-    q3 --> q4 : digito
-    q4 --> q4 : digito
-    q0 --> q5 : aspas
-    q5 --> q5 : qualquer, exceto aspas e quebra de linha
-    q5 --> q6 : aspas
-    q0 --> q7 : igual
-    q7 --> q8 : igual
-    q0 --> q9 : exclamacao
-    q9 --> q10 : igual
-    q0 --> q11 : menor
-    q11 --> q12 : igual
-    q0 --> q13 : maior
-    q13 --> q14 : igual
-    q0 --> q15 : mais, menos, asterisco, barra, parenteses, chaves ou virgula
-    q0 --> q16 : cerquilha
-    q16 --> q16 : qualquer, exceto quebra de linha
-    q16 --> q0 : quebra de linha
-```
 
 **Estados finais F** e o token retornado:
 
@@ -403,40 +363,7 @@ if umidade < limite {
 }
 ```
 
-Árvore sintática (níveis intermediários de expressão foram colapsados em `Expr` para ficar legível):
-
-```mermaid
-graph TD
-    P["Programa"] --> LI["ListaItens"]
-    LI --> IT["Item"]
-    IT --> IN["Instrucao"]
-    IN --> CO["Condicional"]
-    CO --> IF["TK_IF: if"]
-    CO --> EX["Expr"]
-    CO --> B1["Bloco"]
-    CO --> SE["Senao"]
-
-    EX --> E1["umidade  (TK_IDENTIFIER)"]
-    EX --> E2["OpRel: TK_LESS"]
-    EX --> E3["limite  (TK_IDENTIFIER)"]
-
-    B1 --> L1["TK_LBRACE"]
-    B1 --> LI1["ListaInstr"]
-    B1 --> R1["TK_RBRACE"]
-    LI1 --> I1["Instrucao"] --> LG["Liga"]
-    LG --> LG1["TK_POWER: power"]
-    LG --> LG2["TK_IDENTIFIER: bomba"]
-
-    SE --> EL["TK_ELSE: else"]
-    SE --> SC["SenaoCorpo"]
-    SC --> B2["Bloco"]
-    B2 --> L2["TK_LBRACE"]
-    B2 --> LI2["ListaInstr"]
-    B2 --> R2["TK_RBRACE"]
-    LI2 --> I2["Instrucao"] --> DL["Desliga"]
-    DL --> DL1["TK_UNPOWER: unpower"]
-    DL --> DL2["TK_IDENTIFIER: bomba"]
-```
+A árvore sintática abstrata deste programa pode ser gerada com `print_tree()` (ver seção 5.4).
 
 ### 3.8 Erros sintáticos
 
@@ -584,12 +511,3 @@ Resultado atual: **nenhum conflito LL(1)** e os três exemplos são aceitos.
 
 ---
 
-## 6. Material sugerido para o Figma
-
-Para a entrega visual, os elementos que valem ser desenhados/recriados:
-
-1. **Tabela de tokens** (seção 1 de [tabela-de-tokens.md](tabela-de-tokens.md)), agrupada por categoria e com uma cor por categoria (reservadas, booleanos, identificador, literais, operadores, delimitadores).
-2. **Diagrama do AFD** (seção 2.5): estados `q0…q16`, com os estados finais em círculo duplo e o token ao lado.
-3. **Diagramas sintáticos (railroad)** de `Instrucao`, `Condicional`, `Comando` e `Expr`, a partir das produções da seção 3.2.
-4. **Árvore sintática** do exemplo da seção 3.7.
-5. **Fluxo do compilador**: código-fonte → scanner → tokens → parser → árvore sintática (com o `TK_EOF` no final do fluxo de tokens).

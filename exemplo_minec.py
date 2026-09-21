@@ -9,15 +9,16 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 minec_code = """
 # Fazenda automática de trigo - MineC
+# A cada ciclo: checa a umidade da terra, rega se precisar
+# e observa se a plantação já pode ser colhida.
 
 observer umidade = 34
-observer temperatura = 35
+observer maturidade = 0
 lever bomba = 8
-lever ventilador = 9
 
 craft limiteSeco = 30
-craft limiteQuente = 32.5
-craft ciclos = 0
+craft limiteMaduro = 90.5
+craft regas = 0
 
 command irrigar(segundos) {
     say "Irrigando..."
@@ -36,23 +37,27 @@ craft anterior = 0
 
 while true {
     mine umidade
-    mine temperatura
+    mine maturidade
 
     craft media = mediaSimples(umidade, anterior)
     anterior = umidade
 
-    if media < limiteSeco and not (temperatura > limiteQuente) {
+    if media < limiteSeco {
         irrigar(10)
-        ciclos = ciclos + 1
-    } else if temperatura >= limiteQuente {
-        power ventilador
-    } else {
-        unpower ventilador
+        regas = regas + 1
     }
 
-    if ciclos == 5 {
-        say "Ciclo de manutenção"
-        ciclos = 0
+    if maturidade >= limiteMaduro and not (media < limiteSeco) {
+        say "Pronta para colher"
+    } else if maturidade >= 50 {
+        say "Quase pronta"
+    } else {
+        say "Ainda crescendo"
+    }
+
+    if regas == 5 {
+        say "Muitas regas seguidas: verificar o solo"
+        regas = 0
     }
 
     wait 60

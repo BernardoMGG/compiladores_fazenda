@@ -1,8 +1,8 @@
 # Primeiro programa em MineC
-craft mensagem = "Horta iniciada"
+craft mensagem = "Plantação iniciada"
 say mensagem
 
 repeat 3 {
-    say "Colhendo trigo..."
+    say "Observando a plantação..."
     wait 2
 }

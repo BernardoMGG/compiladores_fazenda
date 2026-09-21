@@ -1,6 +1,6 @@
 # Tabela de Tokens — MineC
 
-MineC é uma linguagem de automação de fazendas no estilo Minecraft, com sensores e atuadores simulados.
+MineC é uma linguagem de automação de plantações no estilo Minecraft: checa a umidade da terra, rega se precisar e observa se a planta já pode ser colhida, com sensores e atuadores simulados.
 Esta tabela lista **todos os tokens** reconhecidos pelo analisador léxico. Tokens marcados com ★ foram **adicionados** à lista original da equipe (justificativas na seção 2).
 
 **Total: 39 tokens de linguagem + 1 token auxiliar (`TK_EOF`).**
@@ -50,7 +50,7 @@ Esta tabela lista **todos os tokens** reconhecidos pelo analisador léxico. Toke
 |---|---|---|---|
 | `TK_INTEGER` | `dígito+` | Número inteiro | `30` |
 | `TK_DECIMAL` | `dígito+ . dígito+` | Número decimal | `25.5` |
-| `TK_STRING` | `" (qualquer caractere exceto " e quebra de linha)* "` | Texto | `"Horta iniciada"` |
+| `TK_STRING` | `" (qualquer caractere exceto " e quebra de linha)* "` | Texto | `"Plantação iniciada"` |
 
 ### 1.5 Operadores (11)
 
@@ -60,9 +60,9 @@ Esta tabela lista **todos os tokens** reconhecidos pelo analisador léxico. Toke
 | `TK_EQUAL` | `==` | Igualdade | `x == 10` |
 | `TK_NOT_EQUAL` ★ | `!=` | Diferença | `x != 10` |
 | `TK_LESS` | `<` | Menor que | `umidade < 30` |
-| `TK_GREATER` | `>` | Maior que | `temperatura > 35` |
+| `TK_GREATER` | `>` | Maior que | `maturidade > 80` |
 | `TK_LESS_EQUAL` ★ | `<=` | Menor ou igual | `umidade <= 30` |
-| `TK_GREATER_EQUAL` ★ | `>=` | Maior ou igual | `temperatura >= 35` |
+| `TK_GREATER_EQUAL` ★ | `>=` | Maior ou igual | `maturidade >= 90` |
 | `TK_PLUS` | `+` | Soma | `x + 1` |
 | `TK_MINUS` | `-` | Subtração (e negativo unário) | `x - 1`, `-x` |
 | `TK_STAR` ★ | `*` | Multiplicação | `x * 2` |
@@ -98,14 +98,14 @@ Esta tabela lista **todos os tokens** reconhecidos pelo analisador léxico. Toke
 A lista da equipe está bem estruturada (bom uso do tema Minecraft e categorias claras). O que foi ajustado e por quê:
 
 ### Correções de inconsistência
-- **`lever` aparecia nos exemplos (`lever bomba = true`) mas não existia como token.** Em vez de descartar a ideia, `lever` virou o token `TK_LEVER`, que declara um **atuador** (bomba, ventilador, etc.), par natural de `observer` (sensor). A declaração segue o mesmo formato de `observer`: `lever bomba = 8`. O exemplo de `TK_TRUE`/`TK_FALSE` passou a usar `craft` (`craft ligado = true`).
+- **`lever` aparecia nos exemplos (`lever bomba = true`) mas não existia como token.** Em vez de descartar a ideia, `lever` virou o token `TK_LEVER`, que declara um **atuador** (a bomba de água, por exemplo), par natural de `observer` (sensor). A declaração segue o mesmo formato de `observer`: `lever bomba = 8`. O exemplo de `TK_TRUE`/`TK_FALSE` passou a usar `craft` (`craft ligado = true`).
 - **`TK_IDENTIFIER` e `TK_INTEGER`/`TK_DECIMAL`/`TK_STRING` tinham lexema de exemplo, não padrão.** Na tabela agora aparece o **padrão** (expressão regular em forma legível), que é o que o analisador léxico realmente usa.
 
 ### Tokens adicionados (12), necessários para a linguagem funcionar
 | Adição | Por que é necessária |
 |---|---|
 | `TK_LPAREN`, `TK_RPAREN`, `TK_COMMA` | `command` (função) precisa de parâmetros e chamada: `irrigar(10)`, `media(a, b)`. Também servem para agrupar expressões: `(a + b) / 2`. Sem eles a lista original não consegue definir nem chamar funções com argumentos. |
-| `TK_AND`, `TK_OR`, `TK_NOT` | Uma fazenda automática quase sempre decide com mais de uma condição (`umidade < 30 and temperatura > 20`). Foram feitos como palavras reservadas (ao estilo Python), o que combina com o restante da linguagem. |
+| `TK_AND`, `TK_OR`, `TK_NOT` | Uma plantação automática quase sempre decide com mais de uma condição (`maturidade >= 90 and not (umidade < 30)`). Foram feitos como palavras reservadas (ao estilo Python), o que combina com o restante da linguagem. |
 | `TK_NOT_EQUAL`, `TK_LESS_EQUAL`, `TK_GREATER_EQUAL` | A lista original só tinha `==`, `<`, `>`. Comparações do tipo "umidade **>=** 80" são muito comuns em sensores. |
 | `TK_STAR`, `TK_SLASH` | Só havia `+` e `-`. Multiplicar e dividir é necessário para converter leituras e calcular médias. |
 | `TK_LEVER` | Ver "Correções de inconsistência". |

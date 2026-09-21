@@ -1,6 +1,8 @@
-# 🌾 MineC — Linguagem de Programação para uma Fazenda Automática
+# 🌾 MineC — Linguagem de Programação para uma Plantação Automática
 
-Projeto da disciplina **Linguagens Formais e Compiladores**. MineC é uma linguagem imperativa, pequena e de leitura fácil, com vocabulário inspirado no Minecraft, usada para descrever o comportamento de uma fazenda automática simulada: ler sensores (umidade, temperatura), tomar decisões com condições e laços e acionar atuadores (bomba de água, ventilador).
+Projeto da disciplina **Linguagens Formais e Compiladores**. MineC é uma linguagem imperativa, pequena e de leitura fácil, com vocabulário inspirado no Minecraft, usada para descrever o comportamento de uma plantação automática simulada: **checar a umidade da terra, regar se precisar e observar se a planta já pode ser colhida**.
+
+Na prática, um programa MineC lê sensores (umidade, maturidade), decide com condições e laços e aciona um atuador (a bomba de água). A colheita **não é automática**: o programa apenas observa e avisa quando a planta está pronta.
 
 Escopo desta entrega: **definição da linguagem, análise léxica e análise sintática** (implementadas em Python).
 
@@ -17,21 +19,30 @@ Escopo desta entrega: **definição da linguagem, análise léxica e análise si
 ## Exemplo rápido
 
 ```minec
-# Irrigação automática por umidade do solo
+# Um ciclo: checa a umidade, rega se precisar e observa a maturidade
 observer umidade = 34
+observer maturidade = 92
 lever bomba = 8
-craft limite = 30
+craft limiteSeco = 30
+craft limiteMaduro = 90
 
 mine umidade
-if umidade < limite {
+if umidade < limiteSeco {
     say "Solo seco: ligando a bomba"
     power bomba
     wait 10
     unpower bomba
+}
+
+mine maturidade
+if maturidade >= limiteMaduro {
+    say "Pronta para colher"
 } else {
-    say "Solo úmido: nada a fazer"
+    say "Ainda crescendo"
 }
 ```
+
+O ciclo completo, em laço e com funções, está em [`exemplos/03_fazenda_completa.minec`](exemplos/03_fazenda_completa.minec).
 
 ## A linguagem em resumo
 
@@ -115,8 +126,9 @@ print(ast.print_tree())
 ├── exemplo_minec.py              # Demonstração completa (tokens, AST e erros)
 ├── exemplos/
 │   ├── 01_horta_basica.minec     # Variáveis, say, repeat e wait
-│   ├── 02_irrigacao.minec        # Sensor, atuador e if/else
-│   └── 03_fazenda_completa.minec # command, drop, while, else if, expressões
+│   ├── 02_irrigacao.minec        # Checa a umidade e rega (sensor, atuador, if/else)
+│   └── 03_fazenda_completa.minec # Ciclo completo: umidade, rega e observação da maturidade
+│                                 # (command, drop, while, else if, expressões)
 ├── ferramentas/
 │   └── validador_gramatica.py    # FIRST/FOLLOW, tabela LL(1) e parser preditivo
 └── docs/
