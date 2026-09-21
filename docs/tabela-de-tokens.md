@@ -1,6 +1,6 @@
 # Tabela de Tokens — MineC
 
-MineC é uma linguagem de automação de fazendas no estilo Minecraft, pensada para controlar sensores e atuadores (Arduino e similares).
+MineC é uma linguagem de automação de fazendas no estilo Minecraft, com sensores e atuadores simulados.
 Esta tabela lista **todos os tokens** reconhecidos pelo analisador léxico. Tokens marcados com ★ foram **adicionados** à lista original da equipe (justificativas na seção 2).
 
 **Total: 39 tokens de linguagem + 1 token auxiliar (`TK_EOF`).**
@@ -23,8 +23,8 @@ Esta tabela lista **todos os tokens** reconhecidos pelo analisador léxico. Toke
 | `TK_POWER` | `power` | Liga um atuador | `power bomba` |
 | `TK_UNPOWER` | `unpower` | Desliga um atuador | `unpower bomba` |
 | `TK_WAIT` | `wait` | Espera (em segundos) | `wait 10` |
-| `TK_OBSERVER` | `observer` | Declara um sensor (com o pino) | `observer umidade = 34` |
-| `TK_LEVER` ★ | `lever` | Declara um atuador (com o pino) | `lever bomba = 8` |
+| `TK_OBSERVER` | `observer` | Declara um sensor (com valor inicial) | `observer umidade = 34` |
+| `TK_LEVER` ★ | `lever` | Declara um atuador (com valor inicial) | `lever bomba = 8` |
 | `TK_COMMAND` | `command` | Declara uma função | `command irrigar(t) { ... }` |
 | `TK_DROP` | `drop` | Retorno de função | `drop valor` |
 | `TK_AND` ★ | `and` | E lógico | `a > 1 and b < 2` |
@@ -98,7 +98,7 @@ Esta tabela lista **todos os tokens** reconhecidos pelo analisador léxico. Toke
 A lista da equipe está bem estruturada (bom uso do tema Minecraft e categorias claras). O que foi ajustado e por quê:
 
 ### Correções de inconsistência
-- **`lever` aparecia nos exemplos (`lever bomba = true`) mas não existia como token.** Em vez de descartar a ideia, `lever` virou o token `TK_LEVER`, que declara um **atuador** (bomba, ventilador, etc.), par natural de `observer` (sensor). Como um dispositivo físico precisa de um pino, a declaração é `lever bomba = 8`. O exemplo de `TK_TRUE`/`TK_FALSE` passou a usar `craft` (`craft ligado = true`).
+- **`lever` aparecia nos exemplos (`lever bomba = true`) mas não existia como token.** Em vez de descartar a ideia, `lever` virou o token `TK_LEVER`, que declara um **atuador** (bomba, ventilador, etc.), par natural de `observer` (sensor). A declaração segue o mesmo formato de `observer`: `lever bomba = 8`. O exemplo de `TK_TRUE`/`TK_FALSE` passou a usar `craft` (`craft ligado = true`).
 - **`TK_IDENTIFIER` e `TK_INTEGER`/`TK_DECIMAL`/`TK_STRING` tinham lexema de exemplo, não padrão.** Na tabela agora aparece o **padrão** (expressão regular em forma legível), que é o que o analisador léxico realmente usa.
 
 ### Tokens adicionados (12), necessários para a linguagem funcionar
@@ -117,5 +117,5 @@ Todos os 27 tokens originais foram mantidos, sem mudança de nome ou lexema.
 - **Sem `;`**: as instruções não terminam com ponto e vírgula; cada instrução começa com uma palavra reservada ou identificador, então a gramática continua sem ambiguidade (ver `documentacao.md`, seção 3.6).
 - **Sem acentos em identificadores**: `umidade` sim, `umidáde` não. Acentos são aceitos dentro de strings e comentários.
 - **`say` e `wait`**: `wait` usa **segundos** como unidade (regra semântica, não léxica).
-- **`observer` / `lever` recebem o pino como expressão** (`observer umidade = 34`); `mine umidade` atualiza o valor do sensor `umidade`, que depois pode ser usado em expressões.
+- **`observer` / `lever` recebem um valor inicial como expressão** (`observer umidade = 34`); `mine umidade` atualiza o valor do sensor `umidade`, que depois pode ser usado em expressões.
 - **Comentários com `#`** (em vez de `//`) para não conflitar com o operador `/`.

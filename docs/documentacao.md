@@ -1,7 +1,7 @@
 # MineC — Documentação da Linguagem
 
 **Disciplina:** Linguagens Formais e Compiladores
-**Tema:** Fazenda automática estilo Minecraft controlada por sensores e atuadores (Arduino)
+**Tema:** Linguagem para programar uma fazenda automática simulada, estilo Minecraft
 **Escopo desta entrega:** definição da linguagem, análise léxica e análise sintática.
 
 Documentos relacionados: [Tabela de Tokens](tabela-de-tokens.md) · [Exemplos de programas](../exemplos/)
@@ -13,14 +13,14 @@ Documentos relacionados: [Tabela de Tokens](tabela-de-tokens.md) · [Exemplos de
 2. [Análise léxica](#2-análise-léxica)
 3. [Análise sintática](#3-análise-sintática)
 4. [Regras semânticas (informais)](#4-regras-semânticas-informais)
-5. [Verificação da gramática](#5-verificação-da-gramática)
+5. [Implementação e verificação da gramática](#5-implementação-e-verificação-da-gramática)
 6. [Material sugerido para o Figma](#6-material-sugerido-para-o-figma)
 
 ---
 
 ## 1. Visão geral da linguagem
 
-MineC é uma linguagem imperativa, pequena e de leitura fácil, criada para programar o "cérebro" de uma fazenda automática: ela **lê sensores** (umidade, temperatura), **decide** com condições e laços e **aciona atuadores** (bomba de água, ventilador). As palavras-chave usam o vocabulário do Minecraft:
+MineC é uma linguagem imperativa, pequena e de leitura fácil, criada para descrever o comportamento de uma fazenda automática simulada: ela **lê sensores** (umidade, temperatura), **decide** com condições e laços e **aciona atuadores** (bomba de água, ventilador). Sensores e atuadores são conceitos da própria linguagem; o projeto não depende de nenhum hardware. As palavras-chave usam o vocabulário do Minecraft:
 
 | Conceito | Palavra MineC | Ideia no Minecraft |
 |---|---|---|
@@ -460,8 +460,8 @@ Não fazem parte da análise léxica/sintática, mas definem o comportamento esp
 
 1. **Declaração antes do uso**: todo identificador deve ser declarado (`craft`, `observer`, `lever`, parâmetro ou `command`) antes de ser usado.
 2. **Escopo**: cada bloco `{ }` cria um novo escopo; `command` e declarações de sensor/atuador globais são visíveis em todo o programa.
-3. **`observer id = pino`** declara um sensor; `mine id` só é válido para sensores e atualiza o valor de `id`, que depois é usado em expressões.
-4. **`lever id = pino`** declara um atuador; `power id` / `unpower id` só são válidos para atuadores. O `pino` deve ser um inteiro.
+3. **`observer id = expr`** declara um sensor com um valor inicial; `mine id` só é válido para sensores e atualiza o valor de `id`, que depois é usado em expressões.
+4. **`lever id = expr`** declara um atuador com um valor inicial; `power id` / `unpower id` só são válidos para atuadores.
 5. **`wait n`** espera `n` segundos (`n` numérico). **`repeat n`** exige `n` inteiro.
 6. **Condições** de `if` e `while` devem resultar em booleano.
 7. **Tipos**: `+ - * /` sobre números; `+` também concatena texto; `and or not` sobre booleanos; comparações resultam em booleano.
@@ -472,13 +472,104 @@ Não fazem parte da análise léxica/sintática, mas definem o comportamento esp
 
 ## 5. Implementação e verificação da gramática
 
-**Implementação.** [`minec.py`](../minec.py) contém o analisador léxico (`LexerMineC`, que implementa o AFD da seção 2.5), as classes da árvore sintática abstrata (AST) e o analisador sintático (`ParserMineC`), de **descida recursiva**, com uma função por regra da gramática da seção 3.2 (as regras de expressão seguem a cascata de precedência da seção 3.3). [`exemplo_minec.py`](../exemplo_minec.py) executa um programa MineC completo e imprime a tabela de tokens, a AST e exemplos de erros léxicos e sintáticos.
+### 5.1 Visão geral da implementação
+
+[`minec.py`](../minec.py) contém o analisador léxico (`LexerMineC`, que implementa o AFD da seção 2.5), as classes da árvore sintática abstrata (AST) e o analisador sintático (`ParserMineC`), de **descida recursiva**, com uma função por regra da gramática da seção 3.2 (as regras de expressão seguem a cascata de precedência da seção 3.3). [`exemplo_minec.py`](../exemplo_minec.py) executa um programa MineC completo e imprime a tabela de tokens, a AST e exemplos de erros léxicos e sintáticos.
 
 ```
 python exemplo_minec.py
 ```
 
-**Verificação.** Para garantir que a gramática e os exemplos são consistentes, existe um script que:
+Fluxo: `código-fonte → LexerMineC.tokenize() → lista de Token (termina em TK_EOF) → ParserMineC.parse() → ProgramNode (AST)`.
+
+### 5.2 Como o scanner implementa o AFD
+
+`LexerMineC` é um scanner escrito à mão: um laço único sobre os caracteres, que decide o ramo do autômato pelo primeiro caractere de cada lexema.
+
+| Ramo do laço | Estados do AFD | O que faz |
+|---|---|---|
+| Espaço, tab, `\r`, `\n` | `q0` | Descarta; em `\n` incrementa a linha e zera a coluna |
+| `#` | `q16` | Descarta até o fim da linha |
+| Dois caracteres (`==` `!=` `<=` `>=`) | `q8`, `q10`, `q12`, `q14` | Testado **antes** dos de um caractere (maior casamento) |
+| `!` sozinho | `q9` sem transição | Erro léxico (negação é `not`) |
+| Símbolos de um caractere | `q7`, `q11`, `q13`, `q15` | Emite o token do símbolo |
+| `"` | `q5` → `q6` | Lê até a aspa de fechamento; erro se achar `\n` ou fim do arquivo |
+| Dígito | `q2` → `q3` → `q4` | Lê os dígitos; se vier `.`, exige um dígito depois (senão, erro) e emite `TK_DECIMAL`; sem ponto, emite `TK_INTEGER` |
+| Letra ou `_` | `q1` | Lê o identificador e consulta a tabela de palavras reservadas |
+| Qualquer outro | — | Erro léxico: caractere inválido |
+
+Cada `Token` guarda tipo, valor (lexema), linha e coluna. Letras e dígitos são aceitos só se forem ASCII (`isascii()`), por isso `umidáde` é erro léxico, enquanto acentos dentro de strings e comentários passam.
+
+### 5.3 Como o parser implementa a gramática
+
+Cada não terminal da seção 3.2 vira um método de `ParserMineC`. Os que dependem de listas ou de operadores de mesmo nível foram escritos com laços, em vez de recursão à direita (`ExprR`, `SomaR` etc.), o que dá a **associatividade à esquerda** da seção 3.3.
+
+| Regra da gramática | Método |
+|---|---|
+| `Programa`, `ListaItens`, `Item` | `parse()` |
+| `Comando`, `Params`, `ParamsR` | `command_declaration()` |
+| `Bloco`, `ListaInstr` | `block()` |
+| `Instrucao` | `statement()` (escolhe a alternativa pelo token atual) |
+| `DeclVar`, `DeclSensor`, `DeclAtuador` | `declaration()` |
+| `InstrId`, `InstrIdR` | `identifier_statement()` (atribuição ou chamada) |
+| `Condicional`, `Senao`, `SenaoCorpo` | `if_statement()` (`else if` reaproveita a própria função) |
+| `Args`, `ArgsR` | `arguments()` |
+| `Expr`, `Conj`, `Igual`, `Rel`, `Soma`, `Termo` | `or_expr()`, `and_expr()`, `equality()`, `relational()`, `additive()`, `multiplicative()`, todos sobre um auxiliar `_binary()` |
+| `Unario` | `unary()` |
+| `Primario`, `ChamadaOpc` | `primary()` |
+
+Os utilitários `peek`, `advance`, `check`, `match` e `consume` implementam o **lookahead de um token** exigido pela gramática LL(1). Se `consume` não encontra o token esperado, o parser levanta um erro e **para**.
+
+### 5.4 Árvore sintática abstrata (AST)
+
+A AST não guarda tokens de pontuação (`{`, `}`, `(`, `)`, `,`) nem os níveis intermediários de expressão: só o que tem significado. Nós: `ProgramNode`, `CommandDeclNode`, `VarDeclNode` (`craft`, `observer`, `lever`), `AssignNode`, `CallNode`, `ReadNode` (`mine`), `SayNode`, `PowerNode` (`power`/`unpower`), `WaitNode`, `DropNode`, `IfNode`, `WhileNode`, `RepeatNode`, `BinaryOpNode`, `UnaryOpNode`, `LiteralNode` e `IdentifierNode`. `GroupNode` só serve para agrupar filhos na impressão.
+
+Saída real do parser para o exemplo da seção 2.6 (`print_tree()`):
+
+```
+└── 🌾 PROGRAMA MineC
+    ├── 🔨 CRAFT (variável): limite
+    │   └── 💎 LITERAL [INTEIRO]: 30
+    └── ❓ IF
+        ├── 🔎 Condição:
+        │   └── ⚡ BINARY_OP (and)
+        │       ├── ⚡ BINARY_OP (<=)
+        │       │   ├── 🔮 IDENTIFIER: umidade
+        │       │   └── 💎 LITERAL [DECIMAL]: 32.5
+        │       └── ⚡ UNARY_OP (not)
+        │           └── 🔮 IDENTIFIER: bomba
+        └── ✅ Then:
+            └── 💬 SAY (saída)
+                └── 💎 LITERAL [TEXTO]: 'Seco'
+```
+
+A árvore mostra a precedência: `<=` fica mais fundo que `and`, e `not` só se aplica a `bomba`.
+
+### 5.5 Mensagens de erro reais
+
+As mensagens sugeridas nas seções 2.7 e 3.8 indicam o tipo de erro. As mensagens produzidas pela implementação incluem linha, coluna e o token próximo:
+
+| Código | Mensagem produzida |
+|---|---|
+| `craft x = 3 @ 2` | `[Análise Léxica Error] Linha 1, Coluna 13: Caractere inválido: '@'` |
+| `say "Olá` | `[Análise Léxica Error] Linha 1, Coluna 9: String não fechada (faltou a aspas de fechamento).` |
+| `craft x = 3.` | `[Análise Léxica Error] Linha 1, Coluna 12: Número decimal malformado (falta dígito após o ponto).` |
+| `craft umidáde = 1` | `[Análise Léxica Error] Linha 1, Coluna 11: Caractere inválido: 'á'` |
+| `craft limite 30` | `[Análise Sintática Error] Linha 1, Coluna 14 perto de '30': Esperado '=' na declaração.` |
+| `if x < 3 {` (sem `}`) | `[Análise Sintática Error] Linha 3, Coluna 1 perto de fim do arquivo: Esperado '}' para fechar o bloco.` |
+| `while true {` + quebra de linha + `command f() { }` + `}` | `[Análise Sintática Error] Linha 2, Coluna 5 perto de 'command': 'command' só pode ser declarado no nível global do programa.` |
+| `command f() { drop }` | `[Análise Sintática Error] Linha 1, Coluna 20 perto de '}': Expressão inválida.` |
+| `craft x = 3 4` | `[Análise Sintática Error] Linha 1, Coluna 13 perto de '4': Comando não reconhecido.` |
+
+### 5.6 Limitações da versão atual
+
+- **Sem recuperação de erros:** o scanner e o parser param no **primeiro** erro. A recuperação em modo pânico da seção 3.8 é uma sugestão, não está implementada.
+- **Só análise léxica e sintática:** as regras da seção 4 (declaração antes do uso, tipos, escopo, `drop` só em `command`, quantidade de argumentos) **não são verificadas**. Por exemplo, `drop 1` fora de um `command` é aceito pelo parser.
+- **Sem geração de código nem execução:** o compilador termina na AST.
+
+### 5.7 Verificação da gramática
+
+Para garantir que a gramática e os exemplos são consistentes, existe um script que:
 1. implementa o scanner descrito na seção 2;
 2. calcula automaticamente **FIRST/FOLLOW** e a **tabela LL(1)** da gramática da seção 3.2, detectando conflitos;
 3. executa um parser preditivo sobre os arquivos de [`exemplos/`](../exemplos/) e sobre casos de erro.
