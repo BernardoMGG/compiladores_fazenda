@@ -169,3 +169,6 @@ Análise semântica (declaração antes do uso, tipos, escopo) e geração de c�
 
 ## Figma 
 versão 1.0 <br> https://www.figma.com/make/iZKjuNcyeJPUuvjSl3NoTC/MineC-Irrigation-Monitoring-App?code-node-id=0-6&p=f&t=i0Syq68twlJCT94Z-0&fullscreen=1
+
+## Slide
+versão 1.0 <br> https://gamma.app/docs/MineC-uma-linguagem-para-uma-plantacao-automatica-lpfh6de1oozldsi
