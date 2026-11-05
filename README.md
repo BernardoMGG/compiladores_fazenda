@@ -135,6 +135,7 @@ print(ast.print_tree())
 │   └── validador_gramatica.py    # FIRST/FOLLOW, tabela LL(1) e parser preditivo
 └── docs/
     ├── artigo-minec.pdf          # Artigo do projeto
+    ├── artigo-minec.tex          # Fonte em LaTeX do artigo
     ├── documentacao.md           # Especificação léxica e sintática completa
     └── tabela-de-tokens.md       # Todos os tokens da linguagem
 ```
@@ -163,7 +164,7 @@ Resultado atual: **nenhum conflito LL(1)** e os três exemplos são aceitos.
 
 ## Documentação
 
-- [`docs/artigo-minec.pdf`](docs/artigo-minec.pdf): artigo do projeto, com a linguagem, o compilador, a arquitetura e a verificação.
+- [`docs/artigo-minec.pdf`](docs/artigo-minec.pdf): artigo do projeto, com a linguagem, o compilador, a arquitetura e a verificação. O código-fonte em LaTeX está em [`docs/artigo-minec.tex`](docs/artigo-minec.tex), pronto para o Overleaf.
 - [`docs/documentacao.md`](docs/documentacao.md): visão geral, expressões regulares e AFD do léxico, gramática BNF, precedência, FIRST/FOLLOW, verificação LL(1), exemplo de derivação, erros e regras semânticas informais.
 - [`docs/tabela-de-tokens.md`](docs/tabela-de-tokens.md): tabela completa dos tokens, com lexema, significado, exemplo e justificativa das adições feitas à lista original.
 

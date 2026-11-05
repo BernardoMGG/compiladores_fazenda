@@ -1,0 +1,376 @@
+% Artigo do projeto MineC. Arquivo único: no Overleaf, crie um projeto em branco,
+% cole este conteúdo no main.tex e compile com o pdfLaTeX, que é o padrão.
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[brazil]{babel}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{tikz}
+\usepackage[hidelinks]{hyperref}
+
+\usetikzlibrary{arrows.meta}
+
+\setlist{nosep,leftmargin=*,topsep=4pt}
+\captionsetup{font=small,labelfont=bf}
+\renewcommand{\arraystretch}{1.15}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcommand{\cod}[1]{\texttt{#1}}
+
+\definecolor{fundocodigo}{gray}{0.96}
+\definecolor{palavra}{RGB}{0,70,140}
+\definecolor{texto}{RGB}{140,60,0}
+\definecolor{comentario}{gray}{0.4}
+
+\renewcommand{\lstlistingname}{Listagem}
+\lstdefinelanguage{MineC}{
+  morekeywords={craft,observer,lever,mine,say,if,else,while,repeat,power,unpower,wait,command,drop,and,or,not,true,false},
+  morecomment=[l]{\#},
+  morestring=[b]",
+  sensitive=true
+}
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{fundocodigo},
+  frame=single,
+  rulecolor=\color{black!25},
+  framesep=4pt,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  breaklines=true,
+  aboveskip=10pt,
+  belowskip=10pt,
+  extendedchars=true,
+  literate={á}{{\'a}}1 {ã}{{\~a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ç}{{\c{c}}}1
+}
+
+\title{\textbf{MineC: uma linguagem de domínio específico para irrigação automática}}
+\author{
+  Bernardo Moreira Guimarães Gonçalves, Guilherme Dias Batista, Hugo Watzl, \\
+  Eduardo Jacob, Lucca Barcelos \\[8pt]
+  \normalsize Disciplina de Linguagens Formais e Compiladores, Ibmec \\
+  \normalsize Professor: Willian de Souza Barbosa
+}
+\date{Novembro de 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Este artigo apresenta o MineC, uma linguagem imperativa de domínio específico para programar a irrigação de uma plantação, com vocabulário inspirado no jogo Minecraft. O compilador implementa as análises léxica, sintática e semântica, e um interpretador executa a árvore sintática gerada. Um painel web e um firmware para ESP32 completam o sistema, de modo que toda a lógica da fazenda fica escrita na própria linguagem.
+
+A gramática foi verificada como LL(1) por uma ferramenta que calcula os conjuntos FIRST e FOLLOW, sem nenhum conflito. Em 6000 programas de teste, o validador da gramática e o parser concordaram em todos os casos. A suíte tem 125 testes automatizados, e 35 de 37 defeitos introduzidos de propósito no servidor foram detectados.
+
+O sistema foi validado em simulação e com uma placa imitada por software. Os testes em bancada com sensor, relé e bomba reais ainda não foram feitos e são a principal limitação deste rascunho.
+
+\medskip
+\noindent\textbf{Palavras-chave:} compiladores; linguagens de domínio específico; gramática LL(1); análise semântica; irrigação automática; ESP32.
+\end{abstract}
+
+\section{Introdução}
+
+Uma plantação automática repete sempre o mesmo ciclo: ler a umidade do solo, decidir se precisa regar e acionar a bomba. Essa lógica costuma ficar escondida no firmware do microcontrolador, onde mudar uma regra exige gravar a placa de novo. Escrevê-la numa linguagem própria torna a regra legível e alterável sem tocar no hardware.
+
+Linguagens de domínio específico trocam generalidade por expressão direta dos conceitos de um problema \cite{mernik}. No MineC, sensor e atuador são conceitos da própria linguagem, com palavras reservadas e regras semânticas próprias. O vocabulário do Minecraft reduz a barreira de entrada e mantém o projeto reconhecível para quem conhece o jogo.
+
+O objetivo do trabalho é percorrer as fases de um compilador num caso completo, do texto do programa até o acionamento de uma bomba. A Seção~\ref{sec:linguagem} apresenta a linguagem, a Seção~\ref{sec:compilador} descreve o compilador e a Seção~\ref{sec:arquitetura} mostra a execução e a arquitetura. As Seções~\ref{sec:seguranca} e~\ref{sec:verificacao} tratam de segurança e verificação, e as Seções~\ref{sec:discussao} e~\ref{sec:conclusao} discutem limitações e concluem.
+
+\section{A linguagem MineC}\label{sec:linguagem}
+
+O MineC é imperativo, sem terminador de instrução, com blocos entre chaves, comentários com \cod{\#} e sensível a maiúsculas. Tem quatro tipos de valor: inteiro, decimal, texto e booleano. O controle de fluxo usa \cod{if}, \cod{else if}, \cod{else}, \cod{while} e \cod{repeat}, e funções são declaradas com \cod{command} apenas no nível global.
+
+\begin{table}[htbp]
+\centering
+\caption{Vocabulário da linguagem.}
+\label{tab:vocabulario}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.2cm} >{\raggedright\arraybackslash}p{3.2cm} Y}
+\toprule
+\textbf{Conceito} & \textbf{Palavra} & \textbf{Efeito no protótipo} \\
+\midrule
+Variável & \cod{craft} & guarda um valor \\
+Sensor & \cod{observer} & associa um nome ao pino analógico do ESP32 \\
+Atuador & \cod{lever} & associa um nome ao pino do relé \\
+Ler sensor & \cod{mine} & atualiza o valor com a umidade em \%, ou -1 sem leitura confiável \\
+Ligar e desligar & \cod{power}, \cod{unpower} & aciona o relé da bomba \\
+Função e retorno & \cod{command}, \cod{drop} & agrupa instruções e devolve um valor \\
+Saída & \cod{say} & escreve no console do painel \\
+Espera & \cod{wait} & pausa por um tempo em segundos \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+O programa abaixo foi gerado pelo painel para um canteiro e mostra o ciclo completo da fazenda.
+
+\begin{lstlisting}[language=MineC,keywordstyle=\color{palavra}\bfseries,stringstyle=\color{texto},commentstyle=\color{comentario},caption={Programa gerado pelo painel para um canteiro.},label={lst:programa}]
+observer cenouras = 34
+lever bomba = 26
+
+craft intervalo = 120
+craft tempoRega = 10
+craft minimoCenouras = 30
+
+command regar(segundos) {
+    power bomba
+    wait segundos
+    unpower bomba
+}
+
+while true {
+    mine cenouras
+    if cenouras < 0 {
+        say "sensor sem leitura válida, rega suspensa"
+    } else if cenouras < minimoCenouras {
+        say "solo seco (" + cenouras + "%), irrigando"
+        regar(tempoRega)
+    } else {
+        say "umidade ok (" + cenouras + "%)"
+    }
+    wait intervalo
+}
+\end{lstlisting}
+
+\section{O compilador}\label{sec:compilador}
+
+O compilador transforma o texto em tokens, os tokens em árvore sintática e valida essa árvore antes de qualquer execução. As fases seguem a organização clássica descrita em \cite{aho}. Um erro em qualquer fase impede o programa de rodar e aponta a linha do problema.
+
+\subsection{Análise léxica}
+
+O lexer é um autômato finito determinístico escrito à mão, que reconhece 39 tipos de token além do fim de arquivo \cite{hopcroft}. Ele segue a regra do maior casamento: \cod{<=} é um token só, nunca \cod{<} seguido de \cod{=}. Palavras reservadas são lidas como identificadores e depois consultadas numa tabela, o que simplifica o autômato.
+
+\begin{lstlisting}[caption={Expressões regulares dos principais tokens.},label={lst:tokens}]
+TK_IDENTIFIER  letra (letra | digito)*
+TK_INTEGER     digito+
+TK_DECIMAL     digito+ "." digito+
+TK_STRING      "\"" [^"\n]* "\""
+comentario     "#" [^\n]*
+\end{lstlisting}
+
+\subsection{Análise sintática}
+
+A gramática livre de contexto foi escrita para ser LL(1), e o parser usa descida recursiva sem retrocesso \cite{aho,lewis}. Como nenhuma instrução começa com \cod{-} ou \cod{(}, um único token de lookahead basta para separar instruções, e o \cod{;} se torna desnecessário. O uso de chaves elimina a ambiguidade do \cod{else} pendente.
+
+A precedência fica codificada na cascata de regras, da menor para a maior, e os níveis binários associam à esquerda.
+
+\begin{lstlisting}[mathescape=true,caption={Cascata de precedência das expressões.},label={lst:gramatica}]
+Expr    $\rightarrow$ Conj { or Conj }
+Conj    $\rightarrow$ Igual { and Igual }
+Igual   $\rightarrow$ Rel { (== | !=) Rel }
+Rel     $\rightarrow$ Soma { (< | > | <= | >=) Soma }
+Soma    $\rightarrow$ Termo { (+ | -) Termo }
+Termo   $\rightarrow$ Unario { (* | /) Unario }
+Unario  $\rightarrow$ (not | -) Unario | Primario
+\end{lstlisting}
+
+\subsection{Análise semântica}
+
+A fase semântica percorre a árvore com uma tabela de símbolos encadeada por escopo. Ela verifica declaração antes do uso, compatibilidade de tipos, quantidade de argumentos, \cod{drop} apenas dentro de \cod{command} e \cod{mine} e \cod{power} apenas nos alvos corretos.
+
+O domínio acrescenta regras que uma linguagem genérica não teria, e o compilador conhece os pinos do ESP32:
+
+\begin{itemize}
+  \item Sensor analógico só em ADC1, porque os pinos ADC2 não leem com o Wi-Fi ligado \cite{espressif}.
+  \item Atuador nunca nos pinos de memória flash (6 a 11) nem nos somente entrada (34 a 39).
+  \item Um mesmo pino não pode ser sensor e atuador ao mesmo tempo.
+\end{itemize}
+
+\medskip
+Em modo ESP32 essas violações são erros; em simulação, são avisos. Assim, um pino errado é recusado antes de chegar à placa.
+
+\subsection{Tratamento de erros}
+
+O compilador nunca lança exceção por causa do conteúdo do código: ele sempre devolve uma lista de mensagens com fase e linha. Entradas extremas, como 500 parênteses aninhados, também viram erro com orientação de correção. Literais têm limite: inteiro até 4000 dígitos e texto até 100.000 caracteres.
+
+Além dos erros, o compilador gera avisos para código válido mas suspeito. Exemplos são um \cod{while} sempre verdadeiro sem \cod{wait} e um sensor usado sem nenhum \cod{mine} no programa.
+
+\section{Execução e arquitetura}\label{sec:arquitetura}
+
+Toda decisão da fazenda passa pelo compilador: o painel não aciona o hardware direto, ele gera um programa MineC. O ESP32 não guarda lógica, apenas lê sensores e aplica o estado que o servidor manda. Trocar a regra de irrigação, portanto, não exige regravar a placa.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[x=0.0205cm,y=-0.0205cm,
+    caixa/.style={draw=black!55,rounded corners=2pt},
+    seta/.style={-{Stealth[length=4pt]},draw=black!60},
+    nome/.style={anchor=base west,font=\footnotesize\bfseries,inner sep=0},
+    linha/.style={anchor=base west,font=\scriptsize,text=black!70,inner sep=0}]
+  % servidor
+  \draw[caixa,fill=black!4] (196,56) rectangle (544,380);
+  \node[nome] at (212,80) {Servidor Python};
+  \draw[caixa,fill=white] (212,92) rectangle (528,148);
+  \node[nome] at (228,116) {Gerador};
+  \node[linha] at (228,134) {transforma canteiros em um programa MineC};
+  \draw[caixa,draw=blue!70!black,line width=1pt,fill=blue!10] (212,164) rectangle (528,220);
+  \node[nome] at (228,188) {Compilador};
+  \node[linha] at (228,206) {léxico, sintático, semântico; recusa erros};
+  \draw[caixa,fill=white] (212,236) rectangle (528,292);
+  \node[nome] at (228,260) {Interpretador};
+  \node[linha] at (228,278) {executa a árvore sintática num thread próprio};
+  \draw[caixa,fill=white] (212,308) rectangle (528,364);
+  \node[nome] at (228,332) {Camada de hardware};
+  \node[linha] at (228,350) {barra sensor solto e aplica o limite da bomba};
+  % painel
+  \draw[caixa] (24,92) rectangle (164,220);
+  \node[nome] at (40,116) {Painel web};
+  \node[linha] at (40,140) {canteiros e código};
+  \node[linha] at (40,158) {tokens e árvore};
+  \node[linha] at (40,176) {console};
+  % ESP32 e campo
+  \draw[caixa] (584,276) rectangle (736,380);
+  \node[nome] at (600,300) {ESP32};
+  \node[linha] at (600,322) {envia leituras};
+  \node[linha] at (600,340) {aplica o relé};
+  \node[linha] at (600,358) {corta sem servidor};
+  \draw[caixa] (584,164) rectangle (736,236);
+  \node[nome] at (600,188) {Sensor e relé};
+  \node[linha] at (600,206) {mede o solo};
+  \node[linha] at (600,222) {aciona a bomba};
+  % conexões
+  \draw[seta] (164,120) -- (212,120);
+  \draw[seta] (164,192) -- (212,192);
+  \draw[seta] (370,148) -- (370,164);
+  \draw[seta] (370,220) -- (370,236);
+  \draw[seta] (370,292) -- (370,308);
+  \draw[seta] (212,264) -- (94,264) -- (94,220);
+  \draw[seta] (528,322) -- (584,322);
+  \draw[seta] (584,350) -- (528,350);
+  \draw[{Stealth[length=4pt]}-{Stealth[length=4pt]},draw=black!60] (660,276) -- (660,236);
+  \node[linha] at (24,284) {mensagens e estado};
+  \node[linha] at (600,398) {HTTP a cada 0,5 s};
+\end{tikzpicture}
+\caption{Arquitetura do MineC: toda decisão passa pelo compilador antes de chegar à placa.}
+\label{fig:arquitetura}
+\end{figure}
+
+O painel envia canteiros ao gerador ou código direto ao compilador; o que não compila não chega à execução.
+
+\paragraph{Gerador.} Cada canteiro cadastrado no painel vira declarações e um trecho do laço principal. O gerador garante que nenhum nome dado pelo usuário colida com os nomes internos do programa.
+
+\paragraph{Interpretador.} Percorre a árvore em um thread separado, com ambientes encadeados para o escopo. Ele acessa o mundo físico apenas por \cod{ler\_sensor} e \cod{acionar}, de modo que o mesmo programa roda em simulação ou no ESP32. Um \cod{wait} é descontado em fatias de 0,2~s, o que permite parar o programa quase na hora.
+
+\paragraph{Servidor.} Escrito em Python, usa apenas a biblioteca padrão. Serve o painel, guarda a configuração e só salva um programa novo depois que ele compila.
+
+\paragraph{Painel.} Em HTML, CSS e JavaScript puros, mostra a umidade de cada canteiro e permite editar o código. As abas de tokens e de árvore sintática exibem as fases do compilador sobre o programa atual, o que também serve de material didático.
+
+\paragraph{Firmware.} A cada 0,5~s, o ESP32 envia as leituras brutas por HTTP e recebe o estado desejado de cada relé. O protocolo é texto simples, com uma chave e um valor por linha.
+
+\begin{lstlisting}[caption={Troca de mensagens entre o ESP32 e o servidor.},label={lst:protocolo}]
+POST /api/esp32/sync
+id=minec-esp32-01
+rssi=-58
+a34=2710
+
+resposta:
+ler=34
+saidas=26:1
+periodo=500
+limite=120
+\end{lstlisting}
+
+\section{Segurança}\label{sec:seguranca}
+
+Uma bomba presa ligada alaga o canteiro, então nenhuma camada confia sozinha nas outras. O firmware segue funcionando se o servidor sumir, e o servidor recusa decisões baseadas em dados ruins. A tabela resume cada falha considerada, a resposta e como ela foi conferida até aqui.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Falhas consideradas e resposta do sistema.}
+\label{tab:seguranca}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{4.3cm} Y >{\raggedright\arraybackslash}p{1.5cm} >{\raggedright\arraybackslash}p{2.6cm}}
+\toprule
+\textbf{Falha} & \textbf{Resposta do sistema} & \textbf{Onde} & \textbf{Conferido por} \\
+\midrule
+Sensor solto (leitura bruta até 50 ou a partir de 4090) & \cod{mine} devolve -1 e a bomba daquele sensor não liga & Servidor & Teste com placa falsa \\
+Bomba ligada além do limite (padrão 120~s) & Corta e só religa depois de um \cod{unpower} & Servidor & Teste com placa falsa \\
+Mesma falha, sem o servidor & Corta e só religa depois de o servidor pedir para desligar & Firmware & Leitura do código \\
+Servidor ou Wi-Fi fora do ar & Desliga os relés em até 5~s & Firmware & Cálculo, ainda sem medição \\
+Programa inválido & Não substitui o programa salvo & Servidor & Teste automatizado \\
+Página de outro site comandando a bomba & Recusa pedido de outra origem & Servidor & Teste em navegador real \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+O prazo de 5~s do firmware vem de uma soma: 1,8~s de silêncio tolerável, até 3~s de bloqueio da chamada HTTP e 0,2~s de folga. A leitura do código-fonte da biblioteca mostrou que \cod{getString()} pode travar sem prazo, por isso o firmware confere a chegada do corpo antes de chamá-la.
+
+Dois riscos seguem abertos. O painel não tem login, então quem está na mesma rede pode usá-lo, decisão aceita para um protótipo de sala de aula. E um programa personalizado que alterna \cod{power} e \cod{unpower} sem parar não é barrado, porque o limite conta cada ligação separadamente.
+
+\section{Verificação e resultados}\label{sec:verificacao}
+
+O software passou em todas as verificações automatizadas, mas nada foi testado ainda com hardware real. A verificação combinou testes de unidade, testes contra o servidor em execução, fuzz e testes no navegador. Para saber se os testes medem algo de fato, defeitos foram introduzidos de propósito no código.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Verificações realizadas e resultados.}
+\label{tab:verificacao}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{4.8cm} Y >{\raggedright\arraybackslash}p{3.4cm}}
+\toprule
+\textbf{Verificação} & \textbf{O que foi feito} & \textbf{Resultado} \\
+\midrule
+Conflitos LL(1) & Tabela preditiva calculada a partir da gramática & Nenhum conflito \\
+Testes do compilador, interpretador e gerador & 81 testes & Todos passam \\
+Testes do servidor por HTTP & 44 testes com o servidor real e uma placa imitada & Todos passam \\
+Gramática x parser & 6000 programas gerados e aleatórios & 0 divergências \\
+Execução com fuzz & 1981 programas válidos, com leituras 55, -1, 0 e 100 & Nenhuma exceção Python vazou \\
+Nomes de canteiro & 4000 configurações aleatórias no gerador & Todas compilam \\
+Defeitos no servidor e no hardware & 37 sabotagens, cada uma com o teste esperado & 35 detectadas \\
+Defeitos no compilador & 47 sabotagens, conforme o script do projeto & Todas detectadas após reforçar 2 testes \\
+Painel no navegador & 32 verificações de ponta a ponta & Todas passam \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+A sabotagem também mediu a qualidade dos testes. Um deles passava mesmo com a regra desligada e foi reforçado. Das duas sabotagens no servidor que seguem sem detecção, uma atinge uma proteção que nenhum caminho conhecido alcança e a outra só abre uma condição de corrida rara.
+
+O teste exploratório inicial encontrou 18 problemas que a suíte original, de 28 testes verdes, não via. Os mais graves eram um sensor solto acionando a bomba a cada ciclo e um programa com erro salvo antes de compilar. Todos foram corrigidos, com exceção das pendências de hardware.
+
+\textbf{Pendente:} medir o sistema real. Os dados de bancada (tempo de corte, calibração do sensor, soltura do relé) devem entrar nesta seção quando existirem.
+
+\section{Discussão e limitações}\label{sec:discussao}
+
+O MineC é interpretado no servidor, não compilado para código de máquina. A escolha simplifica mudanças de programa e mantém o ESP32 pequeno, mas torna o sistema dependente da rede: sem servidor, a fazenda só desliga as bombas, e não rega. Gerar código para a placa removeria essa dependência.
+
+Outras limitações conhecidas:
+
+\begin{itemize}
+  \item \textbf{Erros:} o lexer e o parser param no primeiro erro, sem recuperação em modo pânico.
+  \item \textbf{Tipos:} o valor devolvido por um \cod{command} só é conhecido na execução, então parte dos erros de tipo aparece tarde.
+  \item \textbf{Valor -1:} um programa escrito à mão precisa tratar o -1 do \cod{mine}. Sem isso, ele pode anunciar uma rega que a trava do servidor impede.
+  \item \textbf{Validação:} a suíte usa uma placa imitada, e os testes de firmware dependem de bancada. Firmware, sensor, relé e rede real não foram exercitados.
+  \item \textbf{Compilação lenta:} uma soma com 992 termos levou 3,6~s entre compilar e serializar o resultado. Não afeta programas normais.
+\end{itemize}
+
+\section{Conclusão e trabalhos futuros}\label{sec:conclusao}
+
+O MineC mostra as fases de um compilador num problema concreto, com regras semânticas que só fazem sentido naquele domínio, como os pinos válidos do ESP32. Toda a lógica de irrigação fica escrita na linguagem e pode ser lida nas abas do próprio painel. A verificação em software foi extensa, e o passo seguinte é validar o sistema com hardware real.
+
+Trabalhos futuros, em ordem de prioridade:
+
+\begin{enumerate}
+  \item Testar em bancada o corte de segurança, a calibração e o relé, e registrar os resultados.
+  \item Implementar recuperação de erros em modo pânico, para relatar vários erros por compilação.
+  \item Gerar código para o ESP32, permitindo que a fazenda funcione sem servidor.
+  \item Limitar o tempo total de bomba ligada por período, para cobrir programas que alternam liga e desliga.
+\end{enumerate}
+
+\begin{thebibliography}{9}
+\bibitem{mernik} MERNIK, M.; HEERING, J.; SLOANE, A. M. When and how to develop domain-specific languages. \textit{ACM Computing Surveys}, v. 37, n. 4, p. 316-344, 2005. DOI: \href{https://doi.org/10.1145/1118890.1118892}{10.1145/1118890.1118892}.
+\bibitem{aho} AHO, A. V.; LAM, M. S.; SETHI, R.; ULLMAN, J. D. \textit{Compilers: Principles, Techniques, and Tools}. 2. ed. Boston: Pearson/Addison-Wesley, 2007.
+\bibitem{hopcroft} HOPCROFT, J. E.; MOTWANI, R.; ULLMAN, J. D. \textit{Introduction to Automata Theory, Languages, and Computation}. 3. ed. Boston: Pearson/Addison-Wesley, 2007.
+\bibitem{lewis} LEWIS, P. M.; STEARNS, R. E. Syntax-directed transduction. \textit{Journal of the ACM}, v. 15, n. 3, p. 465-488, 1968. DOI: \href{https://doi.org/10.1145/321466.321477}{10.1145/321466.321477}.
+\bibitem{espressif} ESPRESSIF SYSTEMS. \textit{ESP-IDF Programming Guide: Analog to Digital Converter (ADC)}. Disponível em: \href{https://docs.espressif.com/projects/esp-idf/en/v4.4/esp32/api-reference/peripherals/adc.html}{docs.espressif.com}. Acesso em: 5 nov. 2026.
+\end{thebibliography}
+
+\noindent Repositórios do projeto: \href{https://github.com/BernardoMGG/compiladores_fazenda}{compilador e especificação} e \href{https://github.com/gl-dias/minec-irrigacao}{protótipo}.
+
+\end{document}
