@@ -134,6 +134,7 @@ print(ast.print_tree())
 ├── ferramentas/
 │   └── validador_gramatica.py    # FIRST/FOLLOW, tabela LL(1) e parser preditivo
 └── docs/
+    ├── artigo-minec.pdf          # Artigo do projeto
     ├── documentacao.md           # Especificação léxica e sintática completa
     └── tabela-de-tokens.md       # Todos os tokens da linguagem
 ```
@@ -162,6 +163,7 @@ Resultado atual: **nenhum conflito LL(1)** e os três exemplos são aceitos.
 
 ## Documentação
 
+- [`docs/artigo-minec.pdf`](docs/artigo-minec.pdf): artigo do projeto, com a linguagem, o compilador, a arquitetura e a verificação.
 - [`docs/documentacao.md`](docs/documentacao.md): visão geral, expressões regulares e AFD do léxico, gramática BNF, precedência, FIRST/FOLLOW, verificação LL(1), exemplo de derivação, erros e regras semânticas informais.
 - [`docs/tabela-de-tokens.md`](docs/tabela-de-tokens.md): tabela completa dos tokens, com lexema, significado, exemplo e justificativa das adições feitas à lista original.
 
