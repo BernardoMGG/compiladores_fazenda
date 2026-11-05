@@ -23,8 +23,8 @@ Esta tabela lista **todos os tokens** reconhecidos pelo analisador léxico. Toke
 | `TK_POWER` | `power` | Liga um atuador | `power bomba` |
 | `TK_UNPOWER` | `unpower` | Desliga um atuador | `unpower bomba` |
 | `TK_WAIT` | `wait` | Espera (em segundos) | `wait 10` |
-| `TK_OBSERVER` | `observer` | Declara um sensor (com valor inicial) | `observer umidade = 34` |
-| `TK_LEVER` ★ | `lever` | Declara um atuador (com valor inicial) | `lever bomba = 8` |
+| `TK_OBSERVER` | `observer` | Declara um sensor (o número é o pino do ESP32) | `observer umidade = 34` |
+| `TK_LEVER` ★ | `lever` | Declara um atuador (o número é o pino do relé) | `lever bomba = 26` |
 | `TK_COMMAND` | `command` | Declara uma função | `command irrigar(t) { ... }` |
 | `TK_DROP` | `drop` | Retorno de função | `drop valor` |
 | `TK_AND` ★ | `and` | E lógico | `a > 1 and b < 2` |
@@ -117,5 +117,5 @@ Todos os 27 tokens originais foram mantidos, sem mudança de nome ou lexema.
 - **Sem `;`**: as instruções não terminam com ponto e vírgula; cada instrução começa com uma palavra reservada ou identificador, então a gramática continua sem ambiguidade (ver `documentacao.md`, seção 3.6).
 - **Sem acentos em identificadores**: `umidade` sim, `umidáde` não. Acentos são aceitos dentro de strings e comentários.
 - **`say` e `wait`**: `wait` usa **segundos** como unidade (regra semântica, não léxica).
-- **`observer` / `lever` recebem um valor inicial como expressão** (`observer umidade = 34`); `mine umidade` atualiza o valor do sensor `umidade`, que depois pode ser usado em expressões.
+- **`observer` / `lever` recebem uma expressão na declaração** (`observer umidade = 34`). A gramática aceita qualquer expressão, e a fase semântica exige um inteiro com o pino do ESP32. `mine umidade` atualiza o valor do sensor `umidade`, que depois pode ser usado em expressões.
 - **Comentários com `#`** (em vez de `//`) para não conflitar com o operador `/`.

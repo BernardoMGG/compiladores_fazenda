@@ -6,6 +6,8 @@ Na prática, um programa MineC lê sensores (umidade, maturidade), decide com co
 
 Escopo desta entrega: **definição da linguagem, análise léxica e análise sintática** (implementadas em Python).
 
+A análise semântica, o interpretador, o painel web e o firmware do ESP32 estão no protótipo: [gl-dias/minec-irrigacao](https://github.com/gl-dias/minec-irrigacao).
+
 ## Sumário
 
 - [Exemplo rápido](#exemplo-rápido)
@@ -21,8 +23,8 @@ Escopo desta entrega: **definição da linguagem, análise léxica e análise si
 ```minec
 # Um ciclo: checa a umidade, rega se precisar e observa a maturidade
 observer umidade = 34
-observer maturidade = 92
-lever bomba = 8
+observer maturidade = 35
+lever bomba = 26
 craft limiteSeco = 30
 craft limiteMaduro = 90
 
@@ -42,7 +44,7 @@ if maturidade >= limiteMaduro {
 }
 ```
 
-O ciclo completo, em laço e com funções, está em [`exemplos/03_fazenda_completa.minec`](exemplos/03_fazenda_completa.minec).
+Os números em `observer` e `lever` são pinos do ESP32, e `mine` traz a leitura. O ciclo completo, em laço e com funções, está em [`exemplos/03_fazenda_completa.minec`](exemplos/03_fazenda_completa.minec).
 
 ## A linguagem em resumo
 
@@ -62,7 +64,7 @@ Além disso:
 
 - **Controle de fluxo:** `if` / `else if` / `else`, `while` e `repeat N`.
 - **Expressões:** aritméticas (`+ - * /`), relacionais (`< > <= >= == !=`) e lógicas (`and`, `or`, `not`), com parênteses e precedência definida.
-- **Tipos:** inteiro, decimal, texto e booleano (`true` / `false`), verificados numa fase semântica futura.
+- **Tipos:** inteiro, decimal, texto e booleano (`true` / `false`), verificados na fase semântica do protótipo.
 - **Funções:** `command` só no nível global, com parâmetros e retorno via `drop`.
 - **Sem `;`:** blocos com chaves `{ }`; espaços e quebras de linha só separam tokens.
 - **Comentários** de linha com `#`.
@@ -165,7 +167,9 @@ Resultado atual: **nenhum conflito LL(1)** e os três exemplos são aceitos.
 
 ## Fora do escopo
 
-Análise semântica (declaração antes do uso, tipos, escopo) e geração de código estão descritas como regras informais na documentação, mas ainda não foram implementadas.
+Este repositório cobre a definição da linguagem e as análises léxica e sintática. A análise semântica (declaração antes do uso, tipos, escopo, pinos) e a execução estão em [gl-dias/minec-irrigacao](https://github.com/gl-dias/minec-irrigacao). Não há geração de código: o programa é interpretado no servidor.
+
+Os exemplos 02 e 03 usam `lever bomba = 8`. O parser daqui aceita, porque não olha pinos, mas o protótipo recusa esse pino em modo ESP32, por ser da memória flash.
 
 ## Figma 
 versão 1.0 <br> https://www.figma.com/make/iZKjuNcyeJPUuvjSl3NoTC/MineC-Irrigation-Monitoring-App?code-node-id=0-6&p=f&t=i0Syq68twlJCT94Z-0&fullscreen=1

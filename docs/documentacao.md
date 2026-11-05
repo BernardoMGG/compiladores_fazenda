@@ -2,7 +2,7 @@
 
 **Disciplina:** Linguagens Formais e Compiladores
 **Tema:** Linguagem para programar uma plantação automática simulada, estilo Minecraft: checa a umidade da terra, rega se precisar e observa se já pode ser colhida
-**Escopo desta entrega:** definição da linguagem, análise léxica e análise sintática.
+**Escopo desta entrega:** definição da linguagem, análise léxica e análise sintática. A análise semântica, a execução e o hardware estão no [protótipo](https://github.com/gl-dias/minec-irrigacao).
 
 Documentos relacionados: [Tabela de Tokens](tabela-de-tokens.md) · [Exemplos de programas](../exemplos/)
 
@@ -19,7 +19,7 @@ Documentos relacionados: [Tabela de Tokens](tabela-de-tokens.md) · [Exemplos de
 
 ## 1. Visão geral da linguagem
 
-MineC é uma linguagem imperativa, pequena e de leitura fácil, criada para descrever o comportamento de uma plantação automática simulada: ela **lê sensores** (umidade da terra, maturidade da planta), **decide** com condições e laços e **aciona atuadores** (bomba de água). Sensores e atuadores são conceitos da própria linguagem; o projeto não depende de nenhum hardware.
+MineC é uma linguagem imperativa, pequena e de leitura fácil, criada para descrever o comportamento de uma plantação automática simulada: ela **lê sensores** (umidade da terra, maturidade da planta), **decide** com condições e laços e **aciona atuadores** (bomba de água). Sensores e atuadores são conceitos da própria linguagem. A linguagem não depende de hardware; o protótipo roda os programas em simulação e tem firmware para ESP32.
 
 **Ciclo da plantação.** Um programa MineC típico repete três passos:
 
@@ -52,7 +52,7 @@ Um programa completo com esses passos está em [`exemplos/03_fazenda_completa.mi
 ```minec
 # Irrigação automática
 observer umidade = 34
-lever bomba = 8
+lever bomba = 26
 
 mine umidade
 if umidade < 30 {
@@ -72,7 +72,7 @@ O analisador léxico (*scanner*) lê o código-fonte como uma sequência de cara
 
 ### 2.1 Alfabeto
 
-Σ = letras ASCII (`A–Z`, `a–z`), dígitos (`0–9`), `_`, os símbolos `+ - * / = < > ! ( ) { } , " #`, espaço, tab, `\r`, `\n`. Dentro de **strings** e **comentários** qualquer caractere Unicode é aceito (ex.: acentos).
+Σ = letras ASCII (`A–Z`, `a–z`), dígitos (`0–9`), `_`, os símbolos `+ - * / = < > ! ( ) { } , . " #`, espaço, tab, `\r`, `\n`. Dentro de **strings** e **comentários** qualquer caractere Unicode é aceito (ex.: acentos).
 
 ### 2.2 Definições regulares auxiliares
 
@@ -383,17 +383,19 @@ O parser reporta a linha e o token que causou a falha. Exemplos:
 
 ## 4. Regras semânticas (informais)
 
-Não fazem parte da análise léxica/sintática, mas definem o comportamento esperado e servem de base para a próxima etapa:
+Não fazem parte da análise léxica/sintática. Estão descritas aqui de modo informal e implementadas no analisador semântico do [protótipo](https://github.com/gl-dias/minec-irrigacao/blob/main/servidor/compilador.py):
 
 1. **Declaração antes do uso**: todo identificador deve ser declarado (`craft`, `observer`, `lever`, parâmetro ou `command`) antes de ser usado.
 2. **Escopo**: cada bloco `{ }` cria um novo escopo; `command` e declarações de sensor/atuador globais são visíveis em todo o programa.
-3. **`observer id = expr`** declara um sensor com um valor inicial; `mine id` só é válido para sensores e atualiza o valor de `id`, que depois é usado em expressões.
-4. **`lever id = expr`** declara um atuador com um valor inicial; `power id` / `unpower id` só são válidos para atuadores.
-5. **`wait n`** espera `n` segundos (`n` numérico). **`repeat n`** exige `n` inteiro.
+3. **`observer id = pino`** declara um sensor. O número inteiro é o pino analógico do ESP32, não uma leitura. Só `mine id` muda o valor de `id`: a umidade em % (0 a 100), ou -1 sem leitura confiável. Usar o sensor antes do primeiro `mine` é erro de execução.
+4. **`lever id = pino`** declara um atuador. O número inteiro é o pino do relé, e o atuador não tem valor para usar em expressões. `power id` / `unpower id` só são válidos para atuadores.
+5. **`wait n`** espera `n` segundos (`n` numérico, nunca negativo). **`repeat n`** exige `n` inteiro.
 6. **Condições** de `if` e `while` devem resultar em booleano.
 7. **Tipos**: `+ - * /` sobre números; `+` também concatena texto; `and or not` sobre booleanos; comparações resultam em booleano.
 8. **`drop`** só pode aparecer dentro de um `command`.
 9. **Comandos** têm quantidade fixa de parâmetros; a chamada precisa passar a mesma quantidade de argumentos.
+10. **Sensores e atuadores** só podem ser declarados no nível global.
+11. **Pinos do ESP32**: sensor só em ADC1 (GPIO 32, 33, 34, 35, 36 ou 39). Atuador nunca na memória flash (GPIO 6 a 11) nem nos pinos somente de entrada (34, 35, 36 e 39). O mesmo pino não pode ser sensor e atuador. Em modo ESP32 a violação é erro; em simulação, aviso.
 
 ---
 
@@ -415,7 +417,7 @@ Fluxo: `código-fonte → LexerMineC.tokenize() → lista de Token (termina em T
 
 | Ramo do laço | Estados do AFD | O que faz |
 |---|---|---|
-| Espaço, tab, `\r`, `\n` | `q0` | Descarta; em `\n` incrementa a linha e zera a coluna |
+| Espaço, tab, `\r`, `\n` | `q0` | Descarta; em `\n` incrementa a linha e volta a coluna para 1 |
 | `#` | `q16` | Descarta até o fim da linha |
 | Dois caracteres (`==` `!=` `<=` `>=`) | `q8`, `q10`, `q12`, `q14` | Testado **antes** dos de um caractere (maior casamento) |
 | `!` sozinho | `q9` sem transição | Erro léxico (negação é `not`) |
@@ -491,8 +493,8 @@ As mensagens sugeridas nas seções 2.7 e 3.8 indicam o tipo de erro. As mensage
 ### 5.6 Limitações da versão atual
 
 - **Sem recuperação de erros:** o scanner e o parser param no **primeiro** erro. A recuperação em modo pânico da seção 3.8 é uma sugestão, não está implementada.
-- **Só análise léxica e sintática:** as regras da seção 4 (declaração antes do uso, tipos, escopo, `drop` só em `command`, quantidade de argumentos) **não são verificadas**. Por exemplo, `drop 1` fora de um `command` é aceito pelo parser.
-- **Sem geração de código nem execução:** o compilador termina na AST.
+- **Só análise léxica e sintática neste repositório:** as regras da seção 4 (declaração antes do uso, tipos, escopo, `drop` só em `command`, quantidade de argumentos) **não são verificadas** por `minec.py`. Por exemplo, `drop 1` fora de um `command` é aceito pelo parser. O protótipo aplica essas regras numa fase semântica própria.
+- **Sem geração de código:** aqui o compilador termina na AST. O protótipo executa essa árvore com um interpretador, sem gerar código para o ESP32.
 
 ### 5.7 Verificação da gramática
 
